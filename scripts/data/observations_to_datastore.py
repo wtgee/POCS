@@ -35,7 +35,6 @@ class ObservatonsExporter(PanBase):
 
         self.date = start_date
 
-        self.units = dict()
         self.fields = dict()
         self.sequences = dict()
         self.images = dict()
@@ -55,13 +54,6 @@ class ObservatonsExporter(PanBase):
 
     def _build_observation_entity(self, observation):
         obs = observation
-        try:
-            unit_id = obs['observer']
-        except KeyError:
-            unit_id = self.config['pan_id']
-
-        if unit_id == 'Generic PANOPTES Unit':
-            unit_id = self.config['pan_id']
 
         field_id = ''.join(x.capitalize() for x in obs['field_name'].replace('-', '').split(' '))
         if field_id.startswith('Alt_') or field_id.startswith('Az_'):
@@ -71,24 +63,9 @@ class ObservatonsExporter(PanBase):
         img_id = obs['start_time']
 
         try:
-            unit_key = self.units[unit_id].key
-        except KeyError:
-            unit_key = self.ds_client.key('Unit', unit_id)
-            unit_entity = datastore.Entity(
-                unit_key,
-                exclude_from_indexes=['elevation']
-            )
-            unit_entity.update({
-                'lat': obs['latitude'],
-                'lon': obs['longitude'],
-                'elevation': obs['elevation']
-            })
-            self.units[unit_id] = unit_entity
-
-        try:
             field_key = self.fields[field_id].key
         except KeyError:
-            field_key = self.ds_client.key('Field', field_id, parent=unit_key)
+            field_key = self.ds_client.key('Field', field_id)
             field_entity = datastore.Entity(field_key)
             field_entity.update({
                 'ra': obs['field_ra'],
@@ -121,7 +98,8 @@ class ObservatonsExporter(PanBase):
                 'priority': obs['priority'],
                 'set_duration': obs['set_duration'],
                 'ra_rate': obs['tracking_rate_ra'],
-                'pocs_version': obs['creator']
+                'pocs_version': obs['creator'],
+                'unit_id': obs['observer']
             })
             self.sequences[seq_id] = seq_entity
 
@@ -156,7 +134,6 @@ class ObservatonsExporter(PanBase):
             self.images[img_id] = img_entity
 
     def send_to_datastore(self):
-        # self.ds_client.put_multi(self.units.values())
         self.logger.debug("Sending {} field entities to datastore", len(self.fields))
         self.ds_client.put_multi(self.fields.values())
 
@@ -195,7 +172,7 @@ if __name__ == '__main__':
     if args.skip_confirmation is False:
         args.verbose = True
 
-    obs_exporter = ObservatonsExporter(date=args.start_date)
+    obs_exporter = ObservatonsExporter(start_date=args.start_date)
     obs_exporter.collect_entities()
 
     print("Found the following records:")
