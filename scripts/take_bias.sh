@@ -27,14 +27,17 @@ fi
 
 P=$1
 
-SAVE_FILE=${2:-"bias-%Y%m%d-%H%M%S.cr2"}
-echo "Taking bias frames on port ${P}: ${SAVE_FILE}"
+NUM_FRAMES=${2:-1}
 
-NUM_FRAMES=${4:-1}
-SHUTTER_INDEX=${3:-52} # 1/4000s on EOS 100D
+CAMID=$(gphoto2 --port=${P} --get-config serialnumber | grep Current | cut -d ' ' -f 2 | cut -c1-6)
+SAVE_FILE=${3:-"bias-${CAMID}-%Y%m%d-%H%M%S.cr2"}
+
+SHUTTER_INDEX=${4:-52} # 1/4000s on EOS 100D
 
 # Set to fast speed
 gphoto2 --port=${P} --set-config-index shutterspeed=${SHUTTER_INDEX}
+
+echo "Taking ${NUM_FRAMES} bias frames on port ${P}: ${SAVE_FILE}"
 
 COUNTER=0
 until [[ ${COUNTER} -eq ${NUM_FRAMES} ]]; do
