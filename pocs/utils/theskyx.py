@@ -12,7 +12,6 @@ class TheSkyX(PanBase):
     """
 
     def __init__(self, host='localhost', port=3040, connect=True, *args, **kwargs):
-        super(TheSkyX, self).__init__(*args, **kwargs)
 
         self._host = host
         self._port = port
