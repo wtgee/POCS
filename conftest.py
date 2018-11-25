@@ -6,6 +6,7 @@
 # In addition, there are fixtures defined here that are available to
 # all tests, not just those in pocs/tests.
 
+import copy
 import os
 import pytest
 import subprocess
@@ -257,13 +258,19 @@ def memory_db():
 
 @pytest.fixture(scope='module')
 def messaging_ports():
-    return dict(msg_ports=(43001, 43101), cmd_ports=(44001, 44101))
+    # Some code (e.g. POCS._setup_messaging) assumes that sub and pub ports
+    # are sequential so these need to match that assumption for now.
+    return dict(msg_ports=(43001, 43002), cmd_ports=(44001, 44002))
 
 
 @pytest.fixture(scope='function')
 def message_forwarder(messaging_ports):
     cmd = os.path.join(os.getenv('POCS'), 'scripts', 'run_messaging_hub.py')
     args = [cmd]
+    # Note that the other programs using these port pairs consider
+    # them to be pub and sub, in that order, but the forwarder sees things
+    # in reverse: it subscribes to the port that others publish to,
+    # and it publishes to the port that others subscribe to.
     for _, (sub, pub) in messaging_ports.items():
         args.append('--pair')
         args.append(str(sub))
@@ -308,3 +315,35 @@ def cmd_subscriber(message_forwarder):
     subscriber = PanMessaging.create_subscriber(port)
     yield subscriber
     subscriber.close()
+
+
+@pytest.fixture(scope='function')
+def save_environ():
+    old_env = copy.deepcopy(os.environ)
+    yield
+    os.environ = old_env
+
+
+@pytest.fixture(scope='session')
+def data_dir():
+    return os.path.join(os.getenv('POCS'), 'pocs', 'tests', 'data')
+
+
+@pytest.fixture(scope='session')
+def unsolved_fits_file(data_dir):
+    return os.path.join(data_dir, 'unsolved.fits')
+
+
+@pytest.fixture(scope='session')
+def solved_fits_file(data_dir):
+    return os.path.join(data_dir, 'solved.fits.fz')
+
+
+@pytest.fixture(scope='session')
+def tiny_fits_file(data_dir):
+    return os.path.join(data_dir, 'tiny.fits')
+
+
+@pytest.fixture(scope='session')
+def noheader_fits_file(data_dir):
+    return os.path.join(data_dir, 'noheader.fits')

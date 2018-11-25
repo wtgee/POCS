@@ -19,11 +19,13 @@ location:
     longitude: -155.58 # Degrees
     elevation: 3400.0 # Meters
     utc_offset: -10.00 # Hours
-    horizon: 30 # Degrees
-    twilight_horizon: -18 # Degrees
+    horizon: 30 # Degrees; targets must be above this to be considered valid.
+    flat_horizon: -6 # Degrees - Flats when sun between this and focus horizon.
+    focus_horizon: -12 # Degrees - Dark enough to focus on stars.
+    observe_horizon: -18 # Degrees - Sun below this limit to observe.
     timezone: US/Hawaii
-    gmt_offset: -600 # Offset in minutes from GMT during
-                     # standard time (not daylight saving)
+    gmt_offset: -600 # Offset in minutes from GMT during.
+                     # standard time (not daylight saving).
 directories:
     base: /var/panoptes
     images: images
@@ -113,3 +115,19 @@ panoptes_network:
 #         output_timestamp: False
 
 state_machine: simple_state_table
+
+########################### Flat Fields ########################################
+# Controls various aspects of flat fields, both for evening and morning. 
+# The coordinates for the flat-field are calculated for each unit, with the
+# azimuth being -180 degrees from the setting sun and the altitude being near
+# the zenith (currently 70 degrees).
+# 
+# Note: The times at which flat-fielding will occur are controlled by the
+# `location.flat_horizon` and `location.observe_horizon` config entries.
+#
+# take_evening_flats: If we should try to take flats during evening twilight.
+# take_morning_flats: If we should try to take flats during morning twilight.
+################################################################################
+flat_field:
+    take_evening_flats: False
+    take_morning_flats: False

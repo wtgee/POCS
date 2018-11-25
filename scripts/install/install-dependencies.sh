@@ -6,6 +6,9 @@
 THIS_DIR="$(dirname "$(readlink -f "${0}")")"
 THIS_PROGRAM="$(basename "${0}")"
 
+# shellcheck source=/var/panoptes/POCS/scripts/install/install-helper-functions.sh
+source "${THIS_DIR}/install-helper-functions.sh"
+
 # We try to figure out where things are so that minimal work is required
 # by the user.
 VARS_ARE_OK=1
@@ -15,7 +18,7 @@ if [[ -z "${PANDIR}" ]] ; then
     PANDIR=/var/panoptes
     GUESSED_A_VAR=1
   else
-    echo "Unable to find the PANOPTES directory; usually /var/panoptes."
+    echo "PANDIR variable not set to a directory; usually /var/panoptes."
     VARS_ARE_OK=0
   fi
 elif [[ -e "${PANDIR}" && ! -d "${PANDIR}" ]] ; then
@@ -80,14 +83,13 @@ if [[ "${GUESSED_A_VAR}" == "1" ]] ; then
        POCS = ${POCS}
        PAWS = ${PAWS}
      PANLOG = ${PANLOG}
-    PANUSER = ${USER}
+    PANUSER = ${PANUSER}
 "
 fi
 
 # Python 3.6 works around a problem building astroscrappy in 3.7.
 PYTHON_VERSION="3.6"
 ASTROMETRY_VERSION="0.76"
-INSTALL_PREFIX="/usr/local"
 ASTROMETRY_DIR="${PANDIR}/astrometry"
 CONDA_INSTALL_DIR="${PANDIR}/miniconda"
 CONDA_SH="${CONDA_INSTALL_DIR}/etc/profile.d/conda.sh"
@@ -97,14 +99,18 @@ INSTALL_LOGS_DIR="${PANDIR}/logs/install/${TIMESTAMP}"
 SHELL_RC="${HOME}/.bashrc"
 PANOPTES_ENV_SH="${PANDIR}/set-panoptes-env.sh"
 
-DO_APT_GET=1
-DO_MONGODB=1
-DO_CONDA=1
-DO_REBUILD_CONDA_ENV=0
-DO_INSTALL_CONDA_PACKAGES=1
-DO_ASTROMETRY=1
-DO_ASTROMETRY_INDICES=1
-DO_PIP_REQUIREMENTS=1
+# Export these so they can be accessed in by install scripts executed
+# by this script.
+export PANDIR POCS PAWS PANLOG PANUSER
+export DO_APT_GET=1
+export DO_MONGODB=1
+export DO_CONDA=1
+export DO_REBUILD_CONDA_ENV=0
+export DO_INSTALL_CONDA_PACKAGES=1
+export DO_ASTROMETRY=1
+export DO_ASTROMETRY_INDICES=1
+export DO_PIP_REQUIREMENTS=1
+
 DO_RUN_ONE_FUNCTION=""
 
 #-------------------------------------------------------------------------------
@@ -126,7 +132,6 @@ options:
 --no-astrometry            don't install astrometry.net software
 --no-astrometry-indices    don't install astrometry.net indices
 --no-pip-requirements      don't install python packages
---conda-install-dir <dir>  override default of ${CONDA_INSTALL_DIR}
 "
 }
 
@@ -193,36 +198,7 @@ while test ${#} -gt 0; do
 done
 
 #-------------------------------------------------------------------------------
-# Logging support (nascent; I want to add more control and a log file).
-
-# Print a separator bar of # characters.
-function echo_bar() {
-  local terminal_width
-  if [[ -n "$(which resize)" ]] ; then
-    terminal_width="$(resize|grep COLUMNS=|cut -d= -f2)"
-  elif [[ -n "$(which stty)" ]] ; then
-    terminal_width="$(stty size | cut '-d ' -f2)"
-  fi
-  printf "%${terminal_width:-80}s\n" | tr ' ' '#'
-}
-
-#-------------------------------------------------------------------------------
 # Misc helper functions.
-
-# Get the type of the first arg, i.e. shell function, executable, etc.
-# For more info: https://ss64.com/bash/type.html
-#            or: https://bash.cyberciti.biz/guide/Type_command
-function safe_type() {
-  type -t "${1}" || /bin/true
-}
-
-# Print the disk location of the first arg.
-function safe_which() {
-  type -p "${1}" || /bin/true
-}
-
-# Does the first arg start with the second arg?
-function beginswith() { case "${1}" in "${2}"*) true;; *) false;; esac; }
 
 # Backup the file whose path is the first arg, and print the path of the
 # backup file. If the file doesn't exist, no path is output.
@@ -332,7 +308,7 @@ END_OF_FILE
 # when the rc file of the user's shell is executed.
 function update_shell_rc_file() {
   if [[ ! -f "${SHELL_RC}" ]] ; then
-    cat >"${PANOPTES_ENV_SH}" <<END_OF_FILE
+    cat >"${SHELL_RC}" <<END_OF_FILE
 # File created by PANOPTES install-dependencies.sh
 source ${PANOPTES_ENV_SH}
 END_OF_FILE
@@ -368,22 +344,6 @@ function extract_version_from_pkg_config() {
   fi
 }
 
-# Install all of the packages specified in the apt-packages-list file.
-function install_apt_packages() {
-  echo
-  echo "Running sudo apt-get update, you may be prompted for your password."
-  echo
-  (set -x ; sudo apt-get update)
-  # Remove all the comments from the package list and install the packages whose
-  # names are left.
-  APT_PKGS="$(cut '-d#' -f1 "${THIS_DIR}/apt-packages-list.txt" | sort | uniq)"
-  echo
-  echo "Running sudo apt-get install, you may be prompted for your password."
-  echo
-  (set -x ; sudo apt-get install --yes ${APT_PKGS})
-}
-
-
 function install_mongodb() {
   # This is based on https://www.howtoforge.com/tutorial/install-mongodb-on-ubuntu/
   # Note this function does not configure mongodb itself, i.e. no users or
@@ -394,7 +354,12 @@ function install_mongodb() {
   local MONGO_VERSION=""
   local MONGO_SOURCE_PATH=""
   local LSB_RELEASE=""
-  if [[ -n "$(safe_which lsb_release)" ]] ; then
+  # lsb_release is deprecated, removed from many debian distributions,
+  # and not present in the official Ubuntu docker images. /etc/os-release
+  # is recommended instead.
+  if [ -f /etc/os-release ] ; then
+    LSB_RELEASE="$(grep VERSION_CODENAME= /etc/os-release | cut -d= -f2)"
+  elif [[ -n "$(safe_which lsb_release)" ]] ; then
     LSB_RELEASE="$(lsb_release -sc)"
   fi
   if [[ "${LSB_RELEASE}" = "xenial" ]] ; then
@@ -450,49 +415,15 @@ function maybe_install_mongodb() {
   fi
 }
 
+#-------------------------------------------------------------------------------
+# Anaconda (miniconda) support.
+
 # Did the user source conda's etc/profile.d/conda.sh?
 function conda_is_present() {
   if [[ -z "${CONDA_SHLVL}" ]] ; then
     return 1  # No
   fi
   return 0  # Probably
-}
-
-function is_panoptes_env_activated() {
-  if ! conda_is_present ; then
-    return 1  # No
-  fi
-  # Do we have a conda executable? If not, then no environment has
-  # been activated so far.
-  if [[ -z "${CONDA_EXE}" || ! -x "${CONDA_EXE}" ]] ; then
-    return 1  # No
-  fi
-  # Does it work?
-  local -r conda_info="$("${CONDA_EXE}" info 2>/dev/null || /bin/true)"
-  if [[ -z "${conda_info}" ]] ; then
-    return 1  # No
-  fi
-  # Is the panoptes-env activated?
-  if ! (echo "${conda_info}" | grep -q -E 'active environment.*:.*panoptes-env$') ; then
-    return 1  # No
-  fi
-  # Does the env have a valid location?
-  local -r env_location="$(echo "${conda_info}" | \
-                           (grep -E 'active env location :' || /bin/true) | \
-                           cut -d: -f2 | xargs)"
-  if [[ -z "${env_location}" ]] ; then
-    return 1  # No
-  fi
-  if [[ ! -d "${env_location}" ]] ; then
-    return 1  # No
-  fi
-  # Is python in that location?
-  local -r python_location="$(safe_which python)"
-  if ! beginswith "${python_location}" "${env_location}" ; then
-    return 1  # No
-  fi
-  # Looks good.
-  return 0
 }
 
 # Get the location of the panoptes environment.
@@ -523,16 +454,6 @@ function get_panoptes_env_location() {
   echo "${panoptes_env}" | sed 's_.* /_/_'
 }
 
-# Checksum the contents of the panoptes env, allowing us to determine
-# if it changed. This is useful for upgrades, not the first install.
-# For speed and simplicity, we actually just checksum the listing.
-function checksum_panoptes_env() {
-  local -r location="$(get_panoptes_env_location)"
-  if [[ -n "${location}" ]] ; then
-    (cd "${location}" ; find . -type f -ls) | md5sum
-  fi
-}
-
 # Install latest version of Miniconda (Anaconda with very few packages; any that
 # are needed can then be installed).
 function install_conda() {
@@ -547,6 +468,7 @@ function install_conda() {
   echo
   echo "Installing miniconda. License at: https://conda.io/docs/license.html"
   local -r the_script="${PANDIR}/tmp/miniconda.sh"
+  mkdir -p "$(dirname "${the_script}")"
   wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh \
        -O "${the_script}"
   bash "${the_script}" -b -p "${CONDA_INSTALL_DIR}"
@@ -559,6 +481,7 @@ function install_conda() {
   # Where CONDA_INSTALL_DIR is where Anaconda or miniconda was installed.
   # We do the first step here. Later we'll activate the PANOPTES environment.
 
+  # shellcheck disable=SC1090
   . "${CONDA_SH}"
 }
 
@@ -571,6 +494,7 @@ function add_conda_channels() {
   # package. And by default the most recently added repository is treated
   # as the highest priority repository. Here we use prepend to be clear
   # that we want astropy to be highest priority.
+  # shellcheck disable=SC1090
   . "${CONDA_SH}"
   if (conda config --show channels | grep -F -q astropy) ; then
     conda config --remove channels astropy
@@ -588,6 +512,7 @@ function add_conda_channels() {
 function prepare_panoptes_conda_env() {
   # Use the base Anaconda environment until we're ready to
   # work with the PANOPTES environment.
+  # shellcheck disable=SC1090
   . "${CONDA_SH}"
   conda activate base
 
@@ -625,11 +550,12 @@ function prepare_panoptes_conda_env() {
 # 4.4, conda's bin directory is not on the path, so 'which conda'
 # can't be used to determine if it is present.
 #
-# TODO(jamessynge): Stopy allowing for an existing conda to be
+# TODO(jamessynge): Stop allowing for an existing conda to be
 # located elsewhere.
 function maybe_install_conda() {
   # Just in case conda isn't setup, but exists...
   if [[ -z "$(safe_type conda)" && -f "${CONDA_SH}" ]] ; then
+    # shellcheck disable=SC1090
     . "${CONDA_SH}"
   fi
   if [[ -z "$(safe_type conda)" ]] ; then
@@ -802,24 +728,13 @@ fi
 # Install packages using the APT package manager. Works on Debian based systems
 # such as Ubuntu.
 if [[ "${DO_APT_GET}" -eq 1 ]] ; then
-  install_apt_packages
+  "${THIS_DIR}/install-apt-packages.sh"
 fi
 
 # Install Mongodb, a document database. Used by POCS for storing observation
 # metadata and the environment readings from which weather plots are generated.
 if [[ "${DO_MONGODB}" -eq 1 ]] ; then
   maybe_install_mongodb
-fi
-
-# Before installing conda, checksum the environment so we can easily tell
-# if it changed.
-orig_panoptes_env_checksum="$(checksum_panoptes_env)"
-
-# Before installing conda, figure out if the calling shell had the correct
-# environment setup.
-had_activated_panoptes_env=0
-if is_panoptes_env_activated ; then
-  had_activated_panoptes_env=1
 fi
 
 # Install Conda, a Python package manager from Anaconda, Inc. Supports both
@@ -830,6 +745,7 @@ if [[ "${DO_CONDA}" -eq 1 ]] ; then
 fi
 
 if [[ -f "${CONDA_SH}" ]] ; then
+  # shellcheck disable=SC1090
   . "${CONDA_SH}"
 else
   echo_bar

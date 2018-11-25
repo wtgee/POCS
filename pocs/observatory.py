@@ -1,4 +1,5 @@
 import os
+import time
 
 from collections import OrderedDict
 from datetime import datetime
@@ -10,6 +11,7 @@ from astropy import units as u
 from astropy.coordinates import EarthLocation
 from astropy.coordinates import get_moon
 from astropy.coordinates import get_sun
+from astropy.io import fits
 
 from pocs.base import PanBase
 import pocs.dome
@@ -17,7 +19,12 @@ from pocs.images import Image
 from pocs.scheduler.constraint import Duration
 from pocs.scheduler.constraint import MoonAvoidance
 from pocs.scheduler.constraint import Altitude
+from pocs.scheduler.observation import Observation
+from pocs.scheduler.field import Field
 from pocs.utils import current_time
+from pocs.utils import flatten_time
+from pocs.utils import altaz_to_radec
+from pocs.utils import CountdownTimer
 from pocs.utils import error
 from pocs.utils import horizon as horizon_utils
 from pocs.utils import load_module
@@ -68,21 +75,36 @@ class Observatory(PanBase):
         self.logger.info('\t Observatory initialized')
 
 ##########################################################################
-# Properties
+# Helper methods
 ##########################################################################
 
-    @property
-    def is_dark(self):
-        horizon = self.location.get('twilight_horizon', -18 * u.degree)
+    def is_dark(self, horizon='observe', at_time=None):
+        """If sun is below horizon.
 
-        t0 = current_time()
-        is_dark = self.observer.is_night(t0, horizon=horizon)
+        Args:
+            horizon (str, optional): Which horizon to use, 'flat', 'focus', or
+                'observe' (default).
+            at_time (None or `astropy.time.Time`, optional): Time at which to
+                check if dark, defaults to now.
+        """
+        if at_time is None:
+            at_time = current_time()
+        try:
+            horizon_deg = self.config['location']['{}_horizon'.format(horizon)]
+        except KeyError:
+            self.logger.info(f"Can't find {horizon}_horizon, using -18°")
+            horizon_deg = -18 * u.degree
+        is_dark = self.observer.is_night(at_time, horizon=horizon_deg)
 
         if not is_dark:
-            sun_pos = self.observer.altaz(t0, target=get_sun(t0)).alt
-            self.logger.debug("Sun {:.02f} > {}".format(sun_pos, horizon))
+            sun_pos = self.observer.altaz(at_time, target=get_sun(at_time)).alt
+            self.logger.debug(f"Sun {sun_pos:.02f} > {horizon_deg} [{horizon}]")
 
         return is_dark
+
+##########################################################################
+# Properties
+##########################################################################
 
     @property
     def sidereal_time(self):
@@ -596,6 +618,187 @@ class Observatory(PanBase):
             self.logger.info('Closed dome')
         return self.dome.close()
 
+    def take_flat_fields(self,
+                         which='evening',
+                         alt=None,
+                         az=None,
+                         min_counts=1000,
+                         max_counts=12000,
+                         target_adu_percentage=0.5,
+                         initial_exptime=3.,
+                         max_exptime=120.,
+                         camera_list=None,
+                         bias=2048,
+                         max_num_exposures=10,
+                         ):  # pragma: no cover
+        """Take flat fields.
+        This method will slew the mount to the given AltAz coordinates(which
+        should be roughly opposite of the setting sun) and then begin the flat-field
+        procedure. The first image starts with a simple 1 second exposure and
+        after each image is taken the average counts are analyzed and the exposure
+        time is adjusted to try to keep the counts close to `target_adu_percentage`
+        of the `(max_counts + min_counts) - bias`.
+        The next exposure time is calculated as:
+            ```
+                exp_time = int(previous_exp_time * (target_adu / counts) *
+                           (2.0 ** (elapsed_time / 180.0)) + 0.5)
+            ```
+            Under - and over-exposed images are rejected. If image is saturated with
+            a short exposure the method will wait 60 seconds before beginning next
+            exposure.
+            Optionally, the method can also take dark exposures of equal exposure
+            time to each flat-field image.
+        Args:
+            which (str, optional): Specify either 'evening' or 'morning' to lookup coordinates
+                in config, default 'evening'.
+            alt (float, optional): Altitude for flats, default None.
+            az (float, optional): Azimuth for flats, default None.
+            min_counts (int, optional): Minimum ADU count.
+            max_counts (int, optional): Maximum ADU count.
+            target_adu_percentage (float, optional): Exposure time will be adjust so
+                that counts are close to: target * (`min_counts` + `max_counts`). Defaults
+                to 0.5.
+            initial_exptime (float, optional): Start the flat fields with this exposure
+                time, default 3 seconds.
+            max_exptime (float, optional): Maximum exposure time before stopping.
+            camera_list (list, optional): List of cameras to use for flat-fielding.
+            bias (int, optional): Default bias for the cameras.
+            max_num_exposures (int, optional): Maximum number of flats to take.
+        """
+        if camera_list is None:
+            camera_list = list(self.cameras.keys())
+
+        target_adu = target_adu_percentage * (min_counts + max_counts)
+
+        # Get the sun direction multiplier used to determine if exposure
+        # times are increasing or decreasing.
+        if which == 'evening':
+            sun_direction = 1
+        else:
+            sun_direction = -1
+
+        # Setup initial exposure times.
+        exp_times = {cam_name: [initial_exptime * u.second] for cam_name in camera_list}
+
+        # Create the observation.
+        flat_obs = self._create_flat_field_observation(
+            alt=alt, az=az, initial_exptime=initial_exptime
+        )
+
+        # A countdown timeout for the mount slewing.
+        slew_timer = CountdownTimer(5 * u.minute)
+
+        keep_taking_flats = True
+        while keep_taking_flats:
+            # Slew to the flat-field (with 5 minute timeout).
+            self.logger.debug("Slewing to flat-field coords: {}".format(flat_obs.field))
+            self.mount.set_target_coordinates(flat_obs.field)
+            self.mount.slew_to_target()
+            slew_timer.restart()
+            while not self.mount.is_tracking and not slew_timer.expired():
+                self.logger.debug("Slewing to target")
+                time.sleep(5)
+                self.status()
+
+            # Make sure we safely arrive and not timed out.
+            if slew_timer.expired() and not self.mount.is_tracking:
+                raise error.Timeout(f'Problem slewing to flat field.')  # pragma: no cover
+
+            start_time = current_time()
+            fits_headers = self.get_standard_headers(observation=flat_obs)
+            fits_headers['start_time'] = flatten_time(start_time)
+
+            # Take the observations.
+            camera_events = dict()
+            for cam_name in camera_list:
+                camera = self.cameras[cam_name]
+                exp_time = exp_times[cam_name][-1].value
+                filename = os.path.normpath(os.path.join(
+                    flat_obs.directory,
+                    camera.uid,
+                    flat_obs.seq_time,
+                    f'flat_{flat_obs.current_exp_num:02d}.{camera.file_extension}'
+                ))
+                # Take picture and get event.
+                camera_event = camera.take_observation(
+                    flat_obs,
+                    fits_headers,
+                    filename=filename,
+                    exp_time=exp_time
+                )
+                camera_events[cam_name] = {
+                    'event': camera_event,
+                    'filename': filename,
+                }
+
+            # Block until done exposing on all cameras
+            while not all([info['event'].is_set() for info in camera_events.values()]):
+                self.logger.debug('Waiting for flat-field image')
+                time.sleep(1)
+
+            # Check the counts for each image.
+            is_saturated = False
+            for cam_name, info in camera_events.items():
+
+                # Make sure we can find the file.
+                img_file = info['filename'].replace('.cr2', '.fits')
+                if not os.path.exists(img_file):
+                    img_file = img_file.replace('.fits', '.fits.fz')
+                    if not os.path.exists(img_file):  # pragma: no cover
+                        self.logger.warning(f"No flat file {img_file} found, skipping")
+                        continue
+
+                self.logger.debug("Checking counts for {}".format(img_file))
+
+                # Get the bias subtracted data.
+                data = fits.getdata(img_file) - bias
+
+                # Simple mean works just as well as sigma_clipping and is quicker for RGB.
+                counts = data.mean()
+                self.logger.debug("Counts: {:.02f}".format(counts))
+
+                # Check we are above minimum counts.
+                if counts < min_counts:
+                    self.logger.debug("Counts are too low, flat should be discarded")
+                    # TODO(wtgee) Mark in headers? Skip rest of loop?
+
+                # Check we are below maximum counts.
+                if counts >= max_counts:
+                    self.logger.debug("Image is saturated")
+                    is_saturated = True
+                    # TODO(wtgee) Mark in headers? Skip rest of loop?
+
+                # Get suggested exposure time.
+                elapsed_time = (current_time() - start_time).sec
+                self.logger.debug("Elapsed time: {:.02f}".format(elapsed_time))
+                previous_exp_time = exp_times[cam_name][-1].value
+
+                # TODO(wtgee) Document this better.
+                exptime = int(previous_exp_time * (target_adu / counts) *
+                              (2.0 ** (sun_direction * (elapsed_time / 180.0))) + 0.5)
+
+                self.logger.debug(f"Suggested exp_time for {cam_name}: {exptime:.02f}")
+                exp_times[cam_name].append(exptime * u.second)
+
+            # Stop flats if we are going on too long.
+            self.logger.debug("Checking for too many exposures")
+            if any([len(t) - 1 >= max_num_exposures for t in exp_times.values()]):
+                self.logger.debug(f"Have max exposures ({max_num_exposures}), stopping.")
+                keep_taking_flats = False
+
+            # Stop flats if any time is greater than max.
+            self.logger.debug("Checking for long exposures")
+            if any([t[-1].value >= max_exptime for t in exp_times.values()]):
+                self.logger.debug("Exposure times greater than max, stopping flat fields")
+                keep_taking_flats = False
+
+            self.logger.debug("Checking for saturation on short exposure")
+            if is_saturated and exp_times[cam_name][-1].value <= 2:
+                self.logger.debug("Saturated short exposure, waiting 60 seconds")
+                max_num_exposures += 1
+                time.sleep(60)
+                keep_taking_flats = False
+
 ##########################################################################
 # Private Methods
 ##########################################################################
@@ -631,8 +834,9 @@ class Observatory(PanBase):
             pressure = config_site.get('pressure', 0.680) * u.bar
             elevation = config_site.get('elevation', 0 * u.meter)
             horizon = config_site.get('horizon', 30 * u.degree)
-            twilight_horizon = config_site.get(
-                'twilight_horizon', -18 * u.degree)
+            flat_horizon = config_site.get('flat_horizon', -6 * u.degree)
+            focus_horizon = config_site.get('focus_horizon', -12 * u.degree)
+            observe_horizon = config_site.get('observe_horizon', -18 * u.degree)
 
             self.location = {
                 'name': name,
@@ -643,7 +847,9 @@ class Observatory(PanBase):
                 'utc_offset': utc_offset,
                 'pressure': pressure,
                 'horizon': horizon,
-                'twilight_horizon': twilight_horizon,
+                'flat_horizon': flat_horizon,
+                'focus_horizon': focus_horizon,
+                'observe_horizon': observe_horizon,
             }
             self.logger.debug("Location: {}".format(self.location))
 
@@ -751,3 +957,61 @@ class Observatory(PanBase):
         else:
             raise error.NotFound(
                 msg="Fields file does not exist: {}".format(fields_file))
+
+    def _create_flat_field_observation(self,
+                                       alt=70,  # degrees
+                                       az=None,
+                                       field_name='Evening Flat',
+                                       flat_time=None,
+                                       initial_exptime=5):
+        """Small convenince wrapper to create a flat-field Observation.
+
+        Flat-fields are specified by AltAz coordinates so this method is just a helper
+        to look up the current RA-Dec coordaintes based on the unit's location and
+        the current time (or `flat_time` if provided).
+
+        If no azimuth is provided this will figure out the azimuth of the sun at
+        `flat_time` and use that position minus 180 degrees.
+
+        Args:
+            alt (float, optional): Altitude desired, default 70 degrees.
+            az (float, optional): Azimuth desired in degrees, defaults to a position
+                -180 degrees opposite the sun at `flat_time`.
+            field_name (str, optional): Name of the field, which will also be directory
+                name. Note that it is probably best to pass the camera.uid as name.
+            flat_time (`astropy.time.Time`, optional): The time at which the flats
+                will be taken, default `now`.
+            initial_exptime (int, optional): Initial exptime in seconds, default 5.
+        Returns:
+            `pocs.scheduler.Observation`: Information about the flat-field.
+        """
+        self.logger.debug("Creating flat-field observation")
+
+        if flat_time is None:
+            flat_time = current_time()
+
+        # Get an azimuth that is roughly opposite the sun.
+        if az is None:
+            sun_pos = self.observer.altaz(flat_time, target=get_sun(flat_time))
+            az = sun_pos.az.value - 180.  # Opposite the sun
+
+        # Construct RA/Dec coords from the Alt Az.
+        flat_coords = altaz_to_radec(
+            alt=alt,
+            az=az,
+            location=self.earth_location,
+            obstime=flat_time)
+
+        field = Field(field_name, flat_coords)
+        flat_obs = Observation(field, exp_time=initial_exptime * u.second)
+
+        # Note different 'flat' concepts.
+        flat_obs.seq_time = flatten_time(flat_time)
+
+        # Setup the directory to store images.
+        flat_obs._directory = os.path.join(
+            self.config['directories']['images'],
+            'flats',
+        )
+        self.logger.debug("Flat-field observation: {}".format(flat_obs))
+        return flat_obs

@@ -156,10 +156,21 @@ def test_default_config(observatory):
 
 def test_is_dark(observatory):
     os.environ['POCSTIME'] = '2016-08-13 10:00:00'
-    assert observatory.is_dark is True
+    assert observatory.is_dark() is True
 
     os.environ['POCSTIME'] = '2016-08-13 22:00:00'
-    assert observatory.is_dark is False
+    assert observatory.is_dark() is False
+    assert observatory.is_dark() is False
+    assert observatory.is_dark(at_time=Time('2016-08-13 10:00:00')) is True
+    os.environ['POCSTIME'] = '2016-09-09 04:00:00'
+    assert observatory.is_dark(horizon='flat') is False
+    os.environ['POCSTIME'] = '2016-09-09 05:00:00'
+    assert observatory.is_dark(horizon='flat') is True
+    assert observatory.is_dark(horizon='observe') is False
+    assert observatory.is_dark(horizon='invalid-defaults-to-observe') is False
+    os.environ['POCSTIME'] = '2016-09-09 09:00:00'
+    assert observatory.is_dark(horizon='observe') is True
+    assert observatory.is_dark(horizon='invalid-defaults-to-observe') is True
 
 
 def test_standard_headers(observatory):
@@ -355,5 +366,31 @@ def test_operate_dome(config_with_simulated_dome):
     assert observatory.has_dome
     assert observatory.open_dome()
     assert observatory.dome.is_open
+    assert not observatory.dome.is_closed
+    assert observatory.open_dome()
+    assert observatory.dome.is_open
+    assert not observatory.dome.is_closed
     assert observatory.close_dome()
     assert observatory.dome.is_closed
+    assert not observatory.dome.is_open
+    assert observatory.close_dome()
+    assert observatory.dome.is_closed
+    assert not observatory.dome.is_open
+    assert observatory.open_dome()
+    assert observatory.dome.is_open
+    assert not observatory.dome.is_closed
+
+
+def test_create_flat_field(observatory):
+
+    flat0 = observatory._create_flat_field_observation(flat_time=Time('2016-09-09 22:00:00'))
+    assert flat0.field.dec.value == pytest.approx(8.898, rel=1e-2)
+
+    alt = observatory.config['flat_field']['evening']['alt']
+    az = observatory.config['flat_field']['evening']['az']
+
+    os.environ['POCSTIME'] = '2016-09-09 22:00:00'
+    flat1 = observatory._create_flat_field_observation(alt=alt, az=az)
+
+    assert flat1.field.ra.value == pytest.approx(flat0.field.ra.value, rel=1e-2)
+    assert flat1.field.dec.value == pytest.approx(flat0.field.dec.value, rel=1e-2)
