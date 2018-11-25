@@ -19,13 +19,14 @@ from pocs.images import Image
 from pocs.scheduler.constraint import Duration
 from pocs.scheduler.constraint import MoonAvoidance
 from pocs.scheduler.constraint import Altitude
-from pocs.scheduler.observation import Observation
+from pocs.scheduler.observation.dithered import DitheredObservation
 from pocs.scheduler.field import Field
 from pocs.utils import current_time
 from pocs.utils import flatten_time
 from pocs.utils import altaz_to_radec
 from pocs.utils import CountdownTimer
 from pocs.utils import error
+from pocs.utils import dither
 from pocs.utils import horizon as horizon_utils
 from pocs.utils import load_module
 from pocs.camera import AbstractCamera
@@ -681,9 +682,14 @@ class Observatory(PanBase):
         exp_times = {cam_name: [initial_exptime * u.second] for cam_name in camera_list}
 
         # Create the observation.
-        flat_obs = self._create_flat_field_observation(
-            alt=alt, az=az, initial_exptime=initial_exptime
-        )
+        try:
+            flat_obs = self._create_flat_field_observation(
+                alt=alt, az=az, initial_exptime=initial_exptime
+            )
+            self.logger.info(f"Flat-field: {flat_obs}")
+        except Exception as e:
+            self.logger.warning(e)
+            return
 
         # A countdown timeout for the mount slewing.
         slew_timer = CountdownTimer(5 * u.minute)
@@ -755,7 +761,7 @@ class Observatory(PanBase):
 
                 # Simple mean works just as well as sigma_clipping and is quicker for RGB.
                 counts = data.mean()
-                self.logger.debug("Counts: {:.02f}".format(counts))
+                self.logger.info("Counts: {:.02f} Desired: {:.02f}".format(counts, target_adu))
 
                 # Check we are above minimum counts.
                 if counts < min_counts:
@@ -994,19 +1000,44 @@ class Observatory(PanBase):
         if az is None:
             sun_pos = self.observer.altaz(flat_time, target=get_sun(flat_time))
             az = sun_pos.az.value - 180.  # Opposite the sun
+        self.logger.debug(f'Using azimuth={az:.02f} altitude={alt:.02f}')
 
         # Construct RA/Dec coords from the Alt Az.
         flat_coords = altaz_to_radec(
             alt=alt,
             az=az,
             location=self.earth_location,
-            obstime=flat_time)
+            obstime=flat_time,
+            verbose=True)
+        self.logger.debug(f'Flat coords: {flat_coords}')
 
         field = Field(field_name, flat_coords)
-        flat_obs = Observation(field, exp_time=initial_exptime * u.second)
+        flat_obs = DitheredObservation(field, exp_time=initial_exptime * u.second)
+
+        self.logger.debug(f'Flat obs: {flat_obs}')
 
         # Note different 'flat' concepts.
         flat_obs.seq_time = flatten_time(flat_time)
+
+        if isinstance(flat_obs, DitheredObservation):
+            self.logger.debug('Making DitheredObservation for flats')
+
+            dither_coords = dither.get_dither_positions(flat_obs.field.coord,
+                                                        num_positions=9,
+                                                        pattern=dither.dice9,
+                                                        pattern_offset=5 * u.arcmin,
+                                                        random_offset=0.5 * u.arcmin)
+
+            self.logger.debug("Dither Coords for Flat-field: {}".format(dither_coords))
+
+            fields = [Field('Dither{:02d}'.format(i), coord)
+                      for i, coord in enumerate(dither_coords)]
+            exp_times = [flat_obs.exp_time for coord in dither_coords]
+
+            flat_obs.field = fields
+            flat_obs.exp_time = exp_times
+            flat_obs.min_nexp = len(fields)
+            flat_obs.exp_set_size = len(fields)
 
         # Setup the directory to store images.
         flat_obs._directory = os.path.join(
