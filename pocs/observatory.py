@@ -633,22 +633,34 @@ class Observatory(PanBase):
                          max_num_exposures=10,
                          ):  # pragma: no cover
         """Take flat fields.
+
         This method will slew the mount to the given AltAz coordinates(which
         should be roughly opposite of the setting sun) and then begin the flat-field
         procedure. The first image starts with a simple 1 second exposure and
         after each image is taken the average counts are analyzed and the exposure
         time is adjusted to try to keep the counts close to `target_adu_percentage`
         of the `(max_counts + min_counts) - bias`.
+
         The next exposure time is calculated as:
-            ```
-                exp_time = int(previous_exp_time * (target_adu / counts) *
-                           (2.0 ** (elapsed_time / 180.0)) + 0.5)
-            ```
-            Under - and over-exposed images are rejected. If image is saturated with
-            a short exposure the method will wait 60 seconds before beginning next
-            exposure.
-            Optionally, the method can also take dark exposures of equal exposure
-            time to each flat-field image.
+
+        .. code-block:: python
+
+            # Get the sun direction multiplier used to determine if exposure
+            # times are increasing or decreasing.
+            if which == 'evening':
+                sun_direction = 1
+            else:
+                sun_direction = -1
+
+            exptime = previous_exp_time * (target_adu / counts) *
+                          (2.0 ** (sun_direction * (elapsed_time / 180.0))) + 0.5
+
+        Under - and over-exposed images are rejected. If image is saturated with
+        a short exposure the method will wait 60 seconds before beginning next
+        exposure.
+        Optionally, the method can also take dark exposures of equal exposure
+        time to each flat-field image.
+
         Args:
             which (str, optional): Specify either 'evening' or 'morning' to lookup coordinates
                 in config, default 'evening'.
@@ -688,7 +700,7 @@ class Observatory(PanBase):
             )
             self.logger.info(f"Flat-field: {flat_obs}")
         except Exception as e:
-            self.logger.warning(e)
+            self.logger.warning(f'Problem making flat field: {e}')
             return
 
         # A countdown timeout for the mount slewing.
@@ -714,17 +726,22 @@ class Observatory(PanBase):
             fits_headers = self.get_standard_headers(observation=flat_obs)
             fits_headers['start_time'] = flatten_time(start_time)
 
+            # Used for filename of flat field.
+            current_exp = flat_obs.current_exp_num
+
             # Take the observations.
             camera_events = dict()
             for cam_name in camera_list:
                 camera = self.cameras[cam_name]
                 exp_time = exp_times[cam_name][-1].value
+
                 filename = os.path.normpath(os.path.join(
                     flat_obs.directory,
                     camera.uid,
                     flat_obs.seq_time,
-                    f'flat_{flat_obs.current_exp_num:02d}.{camera.file_extension}'
+                    f'flat_{current_exp:02d}.{camera.file_extension}'
                 ))
+
                 # Take picture and get event.
                 camera_event = camera.take_observation(
                     flat_obs,
@@ -732,12 +749,13 @@ class Observatory(PanBase):
                     filename=filename,
                     exp_time=exp_time
                 )
+
                 camera_events[cam_name] = {
                     'event': camera_event,
                     'filename': filename,
                 }
 
-            # Block until done exposing on all cameras
+            # Block until done exposing on all cameras.
             while not all([info['event'].is_set() for info in camera_events.values()]):
                 self.logger.debug('Waiting for flat-field image')
                 time.sleep(1)
@@ -761,7 +779,7 @@ class Observatory(PanBase):
 
                 # Simple mean works just as well as sigma_clipping and is quicker for RGB.
                 counts = data.mean()
-                self.logger.info("Counts: {:.02f} Desired: {:.02f}".format(counts, target_adu))
+                self.logger.debug(f"Counts: {counts:.02f} Desired: {target_adu:.02f}")
 
                 # Check we are above minimum counts.
                 if counts < min_counts:
@@ -1002,14 +1020,15 @@ class Observatory(PanBase):
             az = sun_pos.az.value - 180.  # Opposite the sun
         self.logger.debug(f'Using azimuth={az:.02f} altitude={alt:.02f}')
 
+        self.logger.debug(f'Flat-field coords: alt={alt:.02f} az={az:.02f}')
+
         # Construct RA/Dec coords from the Alt Az.
         flat_coords = altaz_to_radec(
             alt=alt,
             az=az,
             location=self.earth_location,
-            obstime=flat_time,
-            verbose=True)
-        self.logger.debug(f'Flat coords: {flat_coords}')
+            obstime=flat_time)
+        self.logger.debug(f'Flat-field coords: {flat_coords}')
 
         field = Field(field_name, flat_coords)
         flat_obs = DitheredObservation(field, exp_time=initial_exptime * u.second)
