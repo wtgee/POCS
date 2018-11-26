@@ -476,9 +476,6 @@ Hardware names: {}   (or all for all hardware)'''.format(
         """Take flat fields."""
         args, kwargs = parse_options(*arg)
 
-        if 'alt' in kwargs:
-            kwargs['alt'] = float(kwargs['alt'])
-
         if self.pocs is None:
             print_warning('Please run `setup_pocs` before trying to run')
             return
