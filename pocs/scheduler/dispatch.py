@@ -46,10 +46,17 @@ class Scheduler(BaseScheduler):
         valid_obs = {obs: 1.0 for obs in self.observations}
         best_obs = []
 
+        # How long the mount can track the meridian past the target. This is a
+        # property of how many degrees past the meridian the mount allows divided
+        # by the standard sidereal rate. Result should be in hours.
+        degrees_past_meridian = self.config['scheduler'].get('degrees_past_meridian', 0 * u.degree)
+        time_past_meridian = degrees_past_meridian / self.sidereal_rate
+
         common_properties = {
             'end_of_night': self.observer.tonight(time=time, horizon=-18 * u.degree)[-1],
             'moon': get_moon(time, self.observer.location),
-            'observed_list': self.observed_list
+            'observed_list': self.observed_list,
+            'time_past_meridian': time_past_meridian
         }
 
         for constraint in listify(self.constraints):

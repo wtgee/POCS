@@ -83,24 +83,30 @@ class Duration(BaseConstraint):
 
         veto = not observer.target_is_up(time, target, horizon=self.horizon)
 
-        end_of_night = kwargs.get('end_of_night',
-                                  observer.tonight(time=time, horizon=-18 * u.degree)[1])
-
         if not veto:
             # Get the next meridian flip
-            target_meridian = observer.target_meridian_transit_time(
-                time, target,
-                which='next')
+            target_meridian_time = observer.target_meridian_transit_time(
+                time, target, which='next')
+
+            # How long past the meridian to track.
+            time_past_meridian = kwargs.get('time_past_meridian', 0 * u.hour)
+
+            # Get the actual time the meridian flip will occur.
+            meridian_flip_time = target_meridian_time + time_past_meridian
+
+            end_of_night = kwargs.get('end_of_night',
+                                      observer.tonight(time=time, horizon=-18 * u.degree)[1])
 
             # If it flips before end_of_night it hasn't flipped yet so
-            # use the meridian time as the end time
-            if target_meridian < end_of_night:
+            # use the meridian time as the end time.
+            if meridian_flip_time < end_of_night:
 
                 # If target can't meet minimum duration before flip, veto
-                if time + observation.minimum_duration > target_meridian:
+                if time + observation.minimum_duration > meridian_flip_time:
                     self.logger.debug("\t\tObservation minimum can't be met before meridian flip")
                     veto = True
 
+            # TODO(wtgee): why is this `else` commented out?
             # else:
             # Get the next set time
             target_end_time = observer.target_set_time(
@@ -164,6 +170,7 @@ class AlreadyVisited(BaseConstraint):
     has already been visited before. If given `observation` has already been
     visited then it will not be considered for a call to become the `current observation`.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

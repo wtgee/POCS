@@ -55,6 +55,8 @@ class BaseScheduler(PanBase):
         self._current_observation = None
         self.observed_list = OrderedDict()
 
+        self.sidereal_rate = 15.04 * (u.degree / u.hour)
+
         if not self.config['scheduler'].get('check_file', False):
             self.logger.debug("Reading initial set of fields")
             self.read_field_list()
