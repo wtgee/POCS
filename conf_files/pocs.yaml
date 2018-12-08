@@ -36,10 +36,33 @@ directories:
 db: 
     name: panoptes
     type: mongo
+
+########################## Scheduler ###########################################
+# Items to help with changing the scheduler behavior, including the target list.
+#
+# type: The actual scheduler type to use. For now there is only the `dispatch`.
+#       type. For more information see the module files in `$POCS/scheduler/`.
+#
+# fields_file:  The list of targets to use. This is a simple yaml file that gives
+#               information about the target as well as the actual exposures.
+#
+# check_file:   A boolean flag indicating if the `fields_file` should be re-read
+#               during every scheduling attempt, default False. If True, one can
+#               change the yaml file while the unit is in operation.
+#               Note: we haven't yet worked out the appropriate details for what
+#               to do when you change the target that is currently being observed.
+#
+# degrees_past_meridian: The iOptron mounts allow for tracking a certain number
+#                        of degrees past the meridian. This is used as part of
+#                        the Duration constraint to determine how long a target
+#                        is available.
+################################################################################
 scheduler:
     type: dispatch
     fields_file: simple.yaml
     check_file: False
+    degrees_past_meridian: 30
+
 mount:
     brand: ioptron
     model: 30
