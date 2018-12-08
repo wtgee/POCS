@@ -61,7 +61,7 @@ scheduler:
     type: dispatch
     fields_file: simple.yaml
     check_file: False
-    degrees_past_meridian: 30
+    degrees_past_meridian: 0
 
 mount:
     brand: ioptron
