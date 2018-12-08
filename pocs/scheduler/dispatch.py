@@ -50,6 +50,8 @@ class Scheduler(BaseScheduler):
         # property of how many degrees past the meridian the mount allows divided
         # by the standard sidereal rate. Result should be in hours.
         degrees_past_meridian = self.config['scheduler'].get('degrees_past_meridian', 0 * u.degree)
+        if not isinstance(degrees_past_meridian, u.Quantity):
+            degrees_past_meridian *= u.degree
         time_past_meridian = degrees_past_meridian / self.sidereal_rate
 
         common_properties = {

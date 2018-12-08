@@ -90,6 +90,8 @@ class Duration(BaseConstraint):
 
             # How long past the meridian to track.
             time_past_meridian = kwargs.get('time_past_meridian', 0 * u.hour)
+            if not isinstance(time_past_meridian, u.Quantity):
+                time_past_meridian *= u.hour
 
             # Get the actual time the meridian flip will occur.
             meridian_flip_time = target_meridian_time + time_past_meridian
