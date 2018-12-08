@@ -58,6 +58,8 @@ class Scheduler(BaseScheduler):
             'observed_list': self.observed_list,
             'time_past_meridian': time_past_meridian
         }
+        self.logger.debug(f'Common properties for each target:')
+        self.logger.debug(common_properties)
 
         for constraint in listify(self.constraints):
             self.logger.info("Checking Constraint: {}".format(constraint))
