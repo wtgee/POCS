@@ -188,6 +188,16 @@ def test_duration_veto(observer, field_list):
     assert veto is False
 
 
+def test_duration_past_meridian_veto(observer):
+    """ If we cannot view past the meridian the target should veto. """
+    pass
+
+
+def test_duration_past_meridian_allow(observer):
+    """ If we can go past the meridian the target should be allowed. """
+    pass
+
+
 def test_duration_score(observer):
     dc = Duration(30 * u.degree)
 
