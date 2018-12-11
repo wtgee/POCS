@@ -4,6 +4,8 @@ import shutil
 from contextlib import suppress
 
 from matplotlib import pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 from warnings import warn
 
 from astropy.wcs import WCS
@@ -23,6 +25,40 @@ palette = copy(plt.cm.inferno)
 palette.set_over('w', 1.0)
 palette.set_under('k', 1.0)
 palette.set_bad('g', 1.0)
+
+
+def add_colorbar(mappable):
+    """Add a colorbar to a figure that is decently sized.
+
+    Default colorbars in matplotlib aren't the same size an image. This is a utilty
+    function to easily add them.
+
+    Taken from https://joseph-long.com/writing/colorbars/
+
+    Args:
+        mappable (`matplotlib.cm.ScalarMappable`): An object that can have a
+            colorbar. Technically this is something with the mixin applied.
+            See https://matplotlib.org/api/cm_api.html
+
+    Example:
+
+    >>> import numpy as np
+    >>> from matplotlib import pyplot as plt
+    >>> from pocs.utils.images import add_colorbar
+    >>> fig, ax = plt.subplots()
+
+    # Make some fake data
+    >>> data = np.ones((64, 64))
+    >>> data[16:49,16:49] = 0.0
+    >>> img1 = ax.imshow(data)
+    >>> add_colorbar(img1)
+
+    """
+    ax = mappable.axes
+    fig = ax.figure
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    return fig.colorbar(mappable, cax=cax)
 
 
 def make_images_dir():
