@@ -7,8 +7,8 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord
 from string import Template
 
-from pocs.utils import error
-from pocs.utils import theskyx
+from panoptes_utils import error
+from panoptes_utils import theskyx
 
 from pocs.mount import AbstractMount
 

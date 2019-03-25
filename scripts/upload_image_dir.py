@@ -2,11 +2,11 @@
 import os
 from glob import glob
 
-from pocs.utils.config import load_config
-from pocs.utils.google.storage import upload_observation_to_bucket
-from pocs.utils.images import fits as fits_utils
-from pocs.utils.images import make_timelapse
-from pocs.utils import error
+from panoptes_utils.config import load_config
+from panoptes_utils.google.storage import upload_observation_to_bucket
+from panoptes_utils.images import fits as fits_utils
+from panoptes_utils.images import make_timelapse
+from panoptes_utils import error
 
 
 def main(directory,

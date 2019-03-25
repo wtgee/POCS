@@ -78,7 +78,7 @@ instead of `My File.py`.
   Import from the top-down instead:
   ```python
   from pocs.base import PanBase
-  from pocs.utils import current_time
+  from panoptes_utils import current_time
   ```
   The same applies to code inside of `peas`.
 - Test imports are slightly different because `pocs/tests` and `peas/tests` are not Python

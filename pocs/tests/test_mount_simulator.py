@@ -6,7 +6,7 @@ from astropy.coordinates import EarthLocation
 from astropy.coordinates import SkyCoord
 
 from pocs.mount.simulator import Mount
-from pocs.utils import altaz_to_radec
+from panoptes_utils import altaz_to_radec
 
 
 @pytest.fixture

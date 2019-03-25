@@ -17,10 +17,10 @@ from pocs.images import Image
 from pocs.scheduler.constraint import Duration
 from pocs.scheduler.constraint import MoonAvoidance
 from pocs.scheduler.constraint import Altitude
-from pocs.utils import current_time
-from pocs.utils import error
-from pocs.utils import horizon as horizon_utils
-from pocs.utils import load_module
+from panoptes_utils import current_time
+from panoptes_utils import error
+from panoptes_utils import horizon as horizon_utils
+from panoptes_utils import load_module
 from pocs.camera import AbstractCamera
 
 

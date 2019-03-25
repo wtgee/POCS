@@ -3,9 +3,9 @@ import yaml
 
 from transitions import State
 
-from pocs.utils import error
-from pocs.utils import listify
-from pocs.utils import load_module
+from panoptes_utils import error
+from panoptes_utils import listify
+from panoptes_utils import load_module
 
 can_graph = False
 try:  # pragma: no cover

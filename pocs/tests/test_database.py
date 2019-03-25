@@ -1,7 +1,7 @@
 import pytest
 
-from pocs.utils.error import InvalidCollection
-from pocs.utils.logger import get_root_logger
+from panoptes_utils.error import InvalidCollection
+from panoptes_utils.logger import get_root_logger
 
 
 def test_insert_and_no_permanent(db):

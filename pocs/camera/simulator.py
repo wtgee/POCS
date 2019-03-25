@@ -11,8 +11,8 @@ from astropy.io import fits
 
 from pocs.camera import AbstractCamera
 from pocs.camera.sdk import AbstractSDKDriver, AbstractSDKCamera
-from pocs.utils.images import fits as fits_utils
-from pocs.utils import get_quantity_value
+from panoptes_utils.images import fits as fits_utils
+from panoptes_utils import get_quantity_value
 
 
 class Camera(AbstractCamera):

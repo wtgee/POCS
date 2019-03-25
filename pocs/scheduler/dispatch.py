@@ -1,5 +1,5 @@
-from pocs.utils import current_time
-from pocs.utils import listify
+from panoptes_utils import current_time
+from panoptes_utils import listify
 from pocs.scheduler import BaseScheduler
 
 

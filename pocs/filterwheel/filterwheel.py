@@ -3,8 +3,8 @@ import threading
 from astropy import units as u
 
 from pocs.base import PanBase
-from pocs.utils import listify
-from pocs.utils import error
+from panoptes_utils import listify
+from panoptes_utils import error
 
 
 class AbstractFilterWheel(PanBase):

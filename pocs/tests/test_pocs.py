@@ -8,10 +8,10 @@ from astropy import units as u
 from pocs import hardware
 from pocs.core import POCS
 from pocs.observatory import Observatory
-from pocs.utils import CountdownTimer
-from pocs.utils.messaging import PanMessaging
-from pocs.utils import error
-from pocs.utils import current_time
+from panoptes_utils import CountdownTimer
+from panoptes_utils.messaging import PanMessaging
+from panoptes_utils import error
+from panoptes_utils import current_time
 from pocs.camera import create_cameras_from_config
 
 

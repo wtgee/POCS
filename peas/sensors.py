@@ -5,11 +5,11 @@ from serial.tools.list_ports import comports as list_comports
 
 import sys
 
-from pocs.utils.database import PanDB
-from pocs.utils.config import load_config
-from pocs.utils.logger import get_root_logger
-from pocs.utils.messaging import PanMessaging
-from pocs.utils.rs232 import SerialData
+from panoptes_utils.database import PanDB
+from panoptes_utils.config import load_config
+from panoptes_utils.logger import get_root_logger
+from panoptes_utils.messaging import PanMessaging
+from panoptes_utils.rs232 import SerialData
 
 
 class ArduinoSerialMonitor(object):

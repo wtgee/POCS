@@ -11,7 +11,7 @@ from pocs.observatory import Observatory
 from pocs.scheduler.dispatch import Scheduler
 from pocs.scheduler.observation import Observation
 from pocs.camera import create_cameras_from_config
-from pocs.utils import error
+from panoptes_utils import error
 
 
 @pytest.fixture

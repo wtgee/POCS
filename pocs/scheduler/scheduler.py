@@ -8,8 +8,8 @@ from astropy import units as u
 from astropy.coordinates import get_moon
 
 from pocs.base import PanBase
-from pocs.utils import error
-from pocs.utils import current_time
+from panoptes_utils import error
+from panoptes_utils import current_time
 from pocs.scheduler.field import Field
 from pocs.scheduler.observation import Observation
 

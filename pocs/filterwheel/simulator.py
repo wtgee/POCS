@@ -5,7 +5,7 @@ import threading
 
 from astropy import units as u
 
-from pocs.utils import error
+from panoptes_utils import error
 from pocs.filterwheel import AbstractFilterWheel
 
 

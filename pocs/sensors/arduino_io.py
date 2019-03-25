@@ -12,10 +12,10 @@ from serial import serialutil
 import threading
 import traceback
 
-from pocs.utils.error import ArduinoDataError
-from pocs.utils.logger import get_root_logger
-from pocs.utils import CountdownTimer
-from pocs.utils import rs232
+from panoptes_utils.error import ArduinoDataError
+from panoptes_utils.logger import get_root_logger
+from panoptes_utils import CountdownTimer
+from panoptes_utils import rs232
 
 
 def auto_detect_arduino_devices(ports=None, logger=None):

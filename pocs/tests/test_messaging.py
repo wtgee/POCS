@@ -3,7 +3,7 @@ import pytest
 import time
 
 from datetime import datetime
-from pocs.utils.messaging import PanMessaging
+from panoptes_utils.messaging import PanMessaging
 
 
 @pytest.fixture(scope='module')

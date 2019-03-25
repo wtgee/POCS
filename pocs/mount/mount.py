@@ -6,8 +6,8 @@ from astropy.coordinates import SkyCoord
 
 from pocs.base import PanBase
 
-from pocs.utils import current_time
-from pocs.utils import error
+from panoptes_utils import current_time
+from panoptes_utils import error
 
 
 class AbstractMount(PanBase):

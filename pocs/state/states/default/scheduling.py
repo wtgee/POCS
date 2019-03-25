@@ -1,4 +1,4 @@
-from pocs.utils import error
+from panoptes_utils import error
 
 
 def on_enter(event_data):

@@ -4,7 +4,7 @@ import yaml
 
 from pocs.core import POCS
 from pocs.observatory import Observatory
-from pocs.utils import error
+from panoptes_utils import error
 
 
 @pytest.fixture

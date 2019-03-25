@@ -6,11 +6,11 @@ import threading
 import time
 import zmq
 
-from pocs.utils.config import load_config
-from pocs.utils.logger import get_root_logger
-from pocs.utils.messaging import PanMessaging
-from pocs.utils.social_twitter import SocialTwitter
-from pocs.utils.social_slack import SocialSlack
+from panoptes_utils.config import load_config
+from panoptes_utils.logger import get_root_logger
+from panoptes_utils.messaging import PanMessaging
+from panoptes_utils.social_twitter import SocialTwitter
+from panoptes_utils.social_slack import SocialSlack
 
 the_root_logger = None
 

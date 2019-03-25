@@ -5,10 +5,10 @@ from astropy import units as u
 from astropy.coordinates import EarthLocation
 
 from pocs.mount.bisque import Mount
-from pocs.utils import altaz_to_radec
-from pocs.utils import current_time
-from pocs.utils.config import load_config
-from pocs.utils.theskyx import TheSkyX
+from panoptes_utils import altaz_to_radec
+from panoptes_utils import current_time
+from panoptes_utils.config import load_config
+from panoptes_utils.theskyx import TheSkyX
 
 pytestmark = pytest.mark.skipif(TheSkyX().is_connected is False,
                                 reason="TheSkyX is not connected")
