@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 import os
+from glob import glob
 
 from pocs.utils.config import load_config
-from pocs.utils.images import clean_observation_dir
 from pocs.utils.google.storage import upload_observation_to_bucket
+from pocs.utils.images import fits as fits_utils
+from pocs.utils.images import make_timelapse
 from pocs.utils import error
 
 
@@ -51,6 +53,81 @@ def main(directory,
             verbose=verbose, **kwargs)
 
     return directory
+
+
+def clean_observation_dir(dir_name,
+                          remove_jpgs=False,
+                          include_timelapse=True,
+                          timelapse_overwrite=False,
+                          **kwargs):
+    """Clean an observation directory.
+
+    For the given `dir_name`, will:
+        * Compress FITS files
+        * Remove `.solved` files
+        * Create timelapse from JPG files if present (optional, default True)
+        * Remove JPG files (optional, default False).
+
+    Args:
+        dir_name (str): Full path to observation directory.
+        remove_jpgs (bool, optional): If JPGs should be removed after making timelapse,
+            default False.
+        include_timelapse (bool, optional): If a timelapse should be created, default True.
+        timelapse_overwrite (bool, optional): If timelapse file should be overwritten,
+            default False.
+        **kwargs: Can include `verbose`.
+    """
+    verbose = kwargs.get('verbose', False)
+
+    def _print(msg):
+        if verbose:
+            print(msg)
+
+    def _glob(s):
+        return glob(os.path.join(dir_name, s))
+
+    _print("Cleaning dir: {}".format(dir_name))
+
+    # Pack the fits files
+    _print("Packing FITS files")
+    for f in _glob('*.fits'):
+        try:
+            fits_utils.fpack(f)
+        except Exception as e:  # pragma: no cover
+            print('Could not compress fits file: {!r}'.format(e))
+
+    # Remove .solved files
+    _print('Removing .solved files')
+    for f in _glob('*.solved'):
+        try:
+            os.remove(f)
+        except OSError as e:  # pragma: no cover
+            print('Could not delete file: {!r}'.format(e))
+
+    try:
+        jpg_list = _glob('*.jpg')
+
+        if len(jpg_list) > 0:
+
+            # Create timelapse
+            if include_timelapse:
+                try:
+                    _print('Creating timelapse for {}'.format(dir_name))
+                    video_file = make_timelapse(dir_name, overwrite=timelapse_overwrite)
+                    _print('Timelapse created: {}'.format(video_file))
+                except Exception as e:
+                    _print("Problem creating timelapse: {}".format(e))
+
+            # Remove jpgs
+            if remove_jpgs:
+                _print('Removing jpgs')
+                for f in jpg_list:
+                    try:
+                        os.remove(f)
+                    except OSError as e:
+                        print('Could not delete file: {!r}'.format(e))
+    except Exception as e:
+        print('Problem with cleanup creating timelapse: {!r}'.format(e))
 
 
 if __name__ == '__main__':
