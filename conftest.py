@@ -265,7 +265,7 @@ def messaging_ports():
 
 @pytest.fixture(scope='function')
 def message_forwarder(messaging_ports):
-    cmd = os.path.join(os.getenv('POCS'), 'scripts', 'run_messaging_hub.py')
+    cmd = os.path.join(os.getenv('PANDIR'), 'panoptes-utils', 'scripts', 'run_messaging_hub.py')
     args = [cmd]
     # Note that the other programs using these port pairs consider
     # them to be pub and sub, in that order, but the forwarder sees things

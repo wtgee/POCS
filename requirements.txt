@@ -4,8 +4,9 @@ codecov
 coveralls
 dateparser
 gcloud
-matplotlib >= 2.0.0,<3.0.0
+matplotlib > 3.0.0
 numpy >= 1.12.1, !=1.15.3
+panoptes-util
 pycodestyle == 2.3.1
 pytest >= 3.4.0
 python_dateutil >= 2.5.3
