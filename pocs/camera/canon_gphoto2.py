@@ -1,10 +1,7 @@
 import os
 import subprocess
 
-from astropy import units as u
-from threading import Event
-from threading import Timer
-
+from pocs.utils import CountdownTimer
 from pocs.utils import current_time
 from pocs.utils import error
 from pocs.utils.images import cr2 as cr2_utils
@@ -20,6 +17,11 @@ class Camera(AbstractGPhotoCamera):
         self.logger.debug("Connecting GPhoto2 camera")
         self.connect()
         self.logger.debug("{} connected".format(self.name))
+
+    @property
+    def is_exposing(self):
+        """ True if an exposure is currently under way, otherwise False """
+        return self._is_exposing
 
     def connect(self):
         """Connect to Canon DSLR
@@ -67,54 +69,13 @@ class Camera(AbstractGPhotoCamera):
         self.set_properties(prop2index, prop2value)
         self._connected = True
 
-    def take_observation(self, observation, headers=None, filename=None, *args, **kwargs):
-        """Take an observation
+    def take_observation(self, *args, **kwargs):
+        """Take an observation, see docs in `~pocs.camera.camera.Camera`.
 
-        Gathers various header information, sets the file path, and calls
-        `take_exposure`. Also creates a `threading.Event` object and a
-        `threading.Timer` object. The timer calls `process_exposure` after the
-        set amount of time is expired (`observation.exptime + self.readout_time`).
-
-        Note:
-            If a `filename` is passed in it can either be a full path that includes
-            the extension, or the basename of the file, in which case the directory
-            path and extension will be added to the `filename` for output
-
-        Args:
-            observation (~pocs.scheduler.observation.Observation): Object
-                describing the observation
-            headers (dict): Header data to be saved along with the file
-            filename (str, optional): Filename for saving, defaults to ISOT time stamp
-            **kwargs (dict): Optional keyword arguments (`exptime`)
-
-        Returns:
-            threading.Event: An event to be set when the image is done processing
+        This is simply a thin-wrapper that changes the file names from CR2 to FITS.
         """
-        # To be used for marking when exposure is complete (see `process_exposure`)
-        camera_event = Event()
-
-        exptime, file_path, image_id, metadata = self._setup_observation(observation,
-                                                                         headers,
-                                                                         filename,
-                                                                         *args,
-                                                                         **kwargs)
-
-        proc = self.take_exposure(seconds=exptime, filename=file_path)
-
-        # Add most recent exposure to list
-        if self.is_primary:
-            if 'POINTING' in headers:
-                observation.pointing_images[image_id] = file_path.replace('.cr2', '.fits')
-            else:
-                observation.exposure_list[image_id] = file_path.replace('.cr2', '.fits')
-
-        # Process the image after a set amount of time
-        wait_time = exptime + self.readout_time
-        t = Timer(wait_time, self.process_exposure, (metadata, camera_event, proc))
-        t.name = '{}Thread'.format(self.name)
-        t.start()
-
-        return camera_event
+        args['filename'] = args['filename'].replace('.cr2', '.fits')
+        return super().take_observation(*args, **kwargs)
 
     def _start_exposure(self, seconds, filename, dark, header, *args, **kwargs):
         """Take an exposure for given number of seconds and saves to provided filename
@@ -135,6 +96,7 @@ class Camera(AbstractGPhotoCamera):
 
         # Take Picture
         try:
+            self._is_exposing = True
             proc = subprocess.Popen(run_cmd,
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE,
@@ -150,6 +112,29 @@ class Camera(AbstractGPhotoCamera):
         finally:
             readout_args = (filename, header)
             return readout_args
+
+    def _poll_exposure(self, readout_args):
+        """ Wait for exposure to complete.
+
+        This is different from the parent in that it merely waits for a specified
+        amount of time. Always marks `_is_exposing` as True.
+
+        TODO: See #122
+
+        """
+        timer = CountdownTimer(duration=self._timeout)
+        try:
+            # Sleep for duration of exposure.
+            timer.sleep()
+        except Exception as err:
+            self.logger.error('Error while waiting for exposure on {}: {}'.format(self, err))
+            raise err
+        else:
+            # Camera type specific readout function
+            self._readout(*readout_args)
+        finally:
+            self._exposure_event.set()  # Make sure this gets set regardless of readout errors
+            self._is_exposing = False   # Mark exposure as complete.
 
     def _readout(self, cr2_path, info):
         """Reads out the image as a CR2 and converts to FITS"""

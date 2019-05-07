@@ -226,9 +226,8 @@ class AbstractCamera(PanBase, metaclass=ABCMeta):
                                                                          filename,
                                                                          **kwargs)
 
-        exposure_event = self.take_exposure(seconds=exptime, filename=file_path, **kwargs)
+        exposure_event = self.take_exposure(seconds=exptime, filename=file_path, headers=metadata, **kwargs)
 
-        # Add most recent exposure to list
         if self.is_primary:
             if 'POINTING' in headers:
                 observation.pointing_images[image_id] = file_path
