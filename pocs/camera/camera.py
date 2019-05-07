@@ -334,6 +334,7 @@ class AbstractCamera(PanBase, metaclass=ABCMeta):
         file_path = info['file_path']
         exptime = info['exptime']
         field_name = info['field_name']
+        img_type = info.get('img_type', None)
 
         image_title = '{} [{}s] {} {}'.format(field_name,
                                               exptime,
@@ -344,6 +345,7 @@ class AbstractCamera(PanBase, metaclass=ABCMeta):
             self.logger.debug("Processing {}".format(image_title))
             img_utils.make_pretty_image(file_path,
                                         title=image_title,
+                                        img_type=img_type,
                                         link_latest=info['is_primary'])
         except Exception as e:  # pragma: no cover
             self.logger.warning('Problem with extracting pretty image: {}'.format(e))

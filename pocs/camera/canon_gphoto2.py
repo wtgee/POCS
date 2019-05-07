@@ -104,6 +104,7 @@ class Camera(AbstractGPhotoCamera):
             if errs is not None:
                 self.logger.warning(errs)
         finally:
+            header['img_type'] = '.cr2'  # So make_pretty_image will work
             readout_args = (filename, header)
             return readout_args
 
