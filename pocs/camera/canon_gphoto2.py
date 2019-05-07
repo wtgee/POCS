@@ -1,6 +1,5 @@
 import os
 import subprocess
-from contextlib import suppress
 
 from pocs.utils import CountdownTimer
 from pocs.utils import current_time
@@ -13,7 +12,6 @@ class Camera(AbstractGPhotoCamera):
 
     def __init__(self, *args, **kwargs):
         kwargs['readout_time'] = 6.0
-        kwargs['file_extension'] = 'cr2'
         super().__init__(*args, **kwargs)
         self.logger.debug("Connecting GPhoto2 camera")
         self.connect()
@@ -69,18 +67,6 @@ class Camera(AbstractGPhotoCamera):
 
         self.set_properties(prop2index, prop2value)
         self._connected = True
-
-    def take_observation(self, *args, **kwargs):
-        """Take an observation, see docs in `~pocs.camera.camera.Camera`.
-
-        This is simply a thin-wrapper that changes the file names from CR2 to FITS.
-        """
-        # If filename exists, give it .fits extension for going into headers.
-        with suppress(KeyError):
-            kwargs['filename'] = kwargs['filename'].replace('.cr2', '.fits')
-
-        observation_event = super().take_observation(*args, **kwargs)
-        return observation_event
 
     def _start_exposure(self, seconds, filename, dark, header, *args, **kwargs):
         """Take an exposure for given number of seconds and saves to provided filename
