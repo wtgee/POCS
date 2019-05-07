@@ -74,7 +74,7 @@ class Camera(AbstractGPhotoCamera):
 
         This is simply a thin-wrapper that changes the file names from CR2 to FITS.
         """
-        args['filename'] = args['filename'].replace('.cr2', '.fits')
+        kwargs['filename'] = kwargs['filename'].replace('.cr2', '.fits')
         return super().take_observation(*args, **kwargs)
 
     def _start_exposure(self, seconds, filename, dark, header, *args, **kwargs):
