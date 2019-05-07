@@ -1,5 +1,6 @@
 import os
 import subprocess
+from contextlib import suppress
 
 from pocs.utils import CountdownTimer
 from pocs.utils import current_time
@@ -74,8 +75,12 @@ class Camera(AbstractGPhotoCamera):
 
         This is simply a thin-wrapper that changes the file names from CR2 to FITS.
         """
-        kwargs['filename'] = kwargs['filename'].replace('.cr2', '.fits')
-        return super().take_observation(*args, **kwargs)
+        # If filename exists, give it .fits extension for going into headers.
+        with suppress(KeyError):
+            kwargs['filename'] = kwargs['filename'].replace('.cr2', '.fits')
+
+        observation_event = super().take_observation(*args, **kwargs)
+        return observation_event
 
     def _start_exposure(self, seconds, filename, dark, header, *args, **kwargs):
         """Take an exposure for given number of seconds and saves to provided filename
@@ -91,6 +96,9 @@ class Camera(AbstractGPhotoCamera):
             filename (str, optional): Image is saved to this filename
         """
         script_path = '{}/scripts/take_pic.sh'.format(os.getenv('POCS'))
+
+        # The filename here might have come from above as a .fits and we want .cr2
+        filename = filename.replace('.fits', '.cr2')
 
         run_cmd = [script_path, self.port, str(seconds), filename]
 
