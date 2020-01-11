@@ -488,7 +488,7 @@ class AbstractMount(PanBase):
 
         return response
 
-    def home_and_park(self):
+    def home_and_park(self, *args, **kwargs):
         """ Convenience method to first slew to the home position and then park.
         """
         if not self.is_parked:
@@ -498,7 +498,7 @@ class AbstractMount(PanBase):
             # correct side of pier for parking
             self._is_initialized = False
             self.initialize()
-            self.park()
+            self.park(*args, **kwargs)
 
             while self.is_slewing and not self.is_parked:
                 time.sleep(5)
@@ -548,10 +548,17 @@ class AbstractMount(PanBase):
                         if timeout_timer.expired():
                             self.logger.warning(f'slew_to_target timout: {timeout} seconds')
                             raise error.Timeout('Problem slewing to target')
+<<<<<<< HEAD
 
                         self.logger.debug(f'Slewing to target, sleeping for {block_time} seconds')
                         timeout_timer.sleep(max_sleep=block_time)
 
+=======
+
+                        self.logger.debug(f'Slewing to target, sleeping for {block_time} seconds')
+                        timeout_timer.sleep(max_sleep=block_time)
+
+>>>>>>> upstream/develop
                     self.logger.debug(f'Done with slew_to_target block')
             else:
                 self.logger.warning('Problem with slew_to_target')
@@ -591,6 +598,7 @@ class AbstractMount(PanBase):
                 while self.is_home is False:
                     if timeout_timer.expired():
                         self.logger.warning(f'slew_to_home timout: {timeout} seconds')
+                        response = 0
                         break
                     self.logger.debug(f'Slewing to home, sleeping for {block_time} seconds')
                     timeout_timer.sleep(max_sleep=block_time)
@@ -603,7 +611,7 @@ class AbstractMount(PanBase):
         """ Calls `slew_to_home` in base class. Can be overridden.  """
         self.slew_to_home(blocking=blocking)
 
-    def park(self):
+    def park(self, *args, **kwargs):
         """ Slews to the park position and parks the mount.
 
         Note:

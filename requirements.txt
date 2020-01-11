@@ -116,5 +116,3 @@ webencodings==0.5.1       # via bleach
 werkzeug==0.16.0          # via flask
 zipp==0.6.0               # via importlib-metadata
 
-# The following packages are considered to be unsafe in a requirements file:
-# setuptools==42.0.1        # via google-api-core, ipython, jsonschema, kiwisolver, protobuf

@@ -178,9 +178,6 @@ class Mount(AbstractSerialMount):
         Note:
             When mount is parked no movement commands will be accepted.
 
-        Returns:
-            bool: indicating success
-
         Args:
             ra_direction (str, optional): The direction to move the RA axis from
                 the home position. Defaults to 'west' for northern hemisphere.
@@ -190,6 +187,9 @@ class Mount(AbstractSerialMount):
                 from the home position. Defaults to 'south' for northern hemisphere.
             dec_seconds (float, optional): The number of seconds at the fastest
                 move speed to move the Dec axis from the home position.
+
+        Returns:
+            bool: indicating success
         """
 
         if self.is_parked:
@@ -216,7 +216,6 @@ class Mount(AbstractSerialMount):
         self.logger.debug(f'Mount parked: {self.is_parked}')
 
         return self._is_parked
-
 
 ##################################################################################################
 # Private Methods

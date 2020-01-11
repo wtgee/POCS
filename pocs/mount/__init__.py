@@ -44,6 +44,9 @@ def create_mount_from_config(config_port='6563',
     if logger is None:
         logger = get_root_logger()
 
+    if not config:
+        config = load_config(**kwargs)
+
     # If mount_info was not passed as a paramter, check config.
     if mount_info is None:
         logger.debug('No mount info provided, using values from config.')

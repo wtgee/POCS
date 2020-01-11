@@ -124,6 +124,8 @@ class AbstractSDKCamera(AbstractCamera):
             self.target_temperature = target_temperature
             if self.is_cooled_camera:
                 self.cooling_enabled = True
+                msg = f"Set target temperature {target_temperature} & enabled cooling on {self}."
+                self.logger.debug(msg)
             else:
                 msg = "Setting a target temperature on uncooled camera {}".format(self)
                 self.logger.warning(msg)

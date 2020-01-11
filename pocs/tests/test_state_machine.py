@@ -26,6 +26,12 @@ def test_load_bad_state(dynamic_config_server, config_port, observatory):
         pocs._load_state('foo')
 
 
+def test_load_state_info(observatory):
+    pocs = POCS(observatory)
+
+    pocs._load_state('ready', state_info={'tags': ['at_twilight']})
+
+
 def test_state_machine_absolute(temp_file):
     state_table = POCS.load_state_table()
     assert isinstance(state_table, dict)
