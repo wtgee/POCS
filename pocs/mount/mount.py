@@ -548,17 +548,8 @@ class AbstractMount(PanBase):
                         if timeout_timer.expired():
                             self.logger.warning(f'slew_to_target timout: {timeout} seconds')
                             raise error.Timeout('Problem slewing to target')
-<<<<<<< HEAD
-
                         self.logger.debug(f'Slewing to target, sleeping for {block_time} seconds')
                         timeout_timer.sleep(max_sleep=block_time)
-
-=======
-
-                        self.logger.debug(f'Slewing to target, sleeping for {block_time} seconds')
-                        timeout_timer.sleep(max_sleep=block_time)
-
->>>>>>> upstream/develop
                     self.logger.debug(f'Done with slew_to_target block')
             else:
                 self.logger.warning('Problem with slew_to_target')

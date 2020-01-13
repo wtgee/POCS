@@ -758,7 +758,9 @@ class AbstractCamera(PanBase, metaclass=ABCMeta):
                     self.logger.critical(f"Couldn't import {class_name} module {module_name}!")
                     raise err
                 subcomponent_kwargs = copy.deepcopy(subcomponent)
-                subcomponent_kwargs.update({'camera': self, 'config': self.config})
+                # wtgee I've removed the `config` keyword below but not sure if needed.
+                # subcomponent_kwargs.update({'camera': self, 'config': self.config})
+                subcomponent_kwargs.update({'camera': self})
                 setattr(self,
                         class_name_lower,
                         getattr(module, class_name)(**subcomponent_kwargs))
