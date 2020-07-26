@@ -244,7 +244,7 @@ function get_repos() {
       cd "${PANDIR}"
       echo "Cloning ${GITHUB_URL}/${repo}"
       # Just redirect the errors because otherwise looks like it hangs.
-      git clone --single-branch --quiet "${GITHUB_URL}/${repo}.git"
+      git clone --single-branch --quiet "${GITHUB_URL}/${repo}.git" &>>"${LOGFILE}"
 
       # Set panoptes as upstream if clone succeeded.
       if [ $? -eq 0 ]; then
