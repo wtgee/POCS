@@ -94,6 +94,10 @@ while [[ $# -gt 0 ]]; do
     DEVELOPER=true
     shift # past bool argument
     ;;
+  --install-unit)
+    DEVELOPER=false
+    shift # past bool argument
+    ;;
   -u | --user)
     PANUSER="$2"
     shift # past argument
@@ -332,8 +336,6 @@ function do_install() {
   if [[ $REPLY =~ ^[Yy]$ ]]; then
     sudo reboot
   fi
-
-  return
 }
 
 do_install
