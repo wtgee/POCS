@@ -47,6 +47,8 @@ scheduler:
   type: dispatch
   fields_file: simple.yaml
   check_file: False
+  constraints:
+    min_moon_sep: 45
 
 mount:
   brand: ioptron

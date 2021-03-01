@@ -146,7 +146,7 @@ class MoonAvoidance(BaseConstraint):
         moon_sep = moon.separation(observation.field.coord).value
 
         # Check we are a certain number of degrees from moon.
-        min_moon_sep = kwargs.get('min_moon_sep', 45)
+        min_moon_sep = self.get_config('scheduler.constraints.min_moon_sep', default=45)
         if moon_sep < min_moon_sep:
             self.logger.debug(f"\t\tMoon separation: {moon_sep:.02f} < {min_moon_sep:.02f}")
             veto = True
